@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 var (
@@ -35,9 +36,27 @@ type SignalMessage struct {
 
 func main(){
 	e := echo.New()
-	// e.Use(middleware.Logger())
-	// e.Use(middleware.Recover())
-	// e.Use(middleware.CORS())
+
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+    e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+        AllowOrigins: []string{"*"}, 
+        AllowMethods: []string{
+            http.MethodGet,
+            http.MethodHead,
+            http.MethodPut,
+            http.MethodPatch,
+            http.MethodPost,
+            http.MethodDelete,
+        },
+        AllowHeaders: []string{
+            echo.HeaderOrigin,
+            echo.HeaderContentType,
+            echo.HeaderAccept,
+            echo.HeaderAuthorization,
+        },
+        AllowCredentials: true,
+    }))
 
     e.GET("/ws", handleWebSocket)
     e.GET("/rooms", listRooms)

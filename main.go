@@ -35,7 +35,7 @@ func main(){
 
     e.GET("/ws", api.HandleWebSocket)
     e.GET("/rooms", api.ListRooms)
-	e.POST("rooms", api.CreateRoom)
+	e.POST("/rooms", api.CreateRoom)
     e.GET("/health", api.HealthCheck)
 
     // Start server

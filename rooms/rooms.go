@@ -10,6 +10,7 @@ import (
 )
 
 type Room struct {
+	Owner *websocket.Conn
 	Peers map[*websocket.Conn]bool
 	mu sync.Mutex
 }
@@ -26,7 +27,7 @@ var(
 	mu sync.Mutex
 )
 
-func CreateRoom() (string,error) {
+func CreateEmptyRoom() (string,error) {
 	roomID := uuid.NewString()
 	mu.Lock()
 	_, exists  := rooms[roomID]
@@ -42,12 +43,29 @@ func CreateRoom() (string,error) {
 	return roomID, nil
 }
 
+func CreateRoom(owner *websocket.Conn) (string,error) {
+	roomID := uuid.NewString()
+	mu.Lock()
+	_, exists  := rooms[roomID]
+	if !exists {
+		room := &Room{
+			Owner: owner,
+			Peers: make(map[*websocket.Conn]bool),
+		}
+
+		rooms[roomID] = room
+	}
+	mu.Unlock()
+
+	return roomID, nil
+}
+
 func GetRoom(roomID string) (*Room, bool) {
 	room, exists  := rooms[roomID]
 	return room, exists
 }
 
-func GetRooms() ([]map[string]interface{}, error) {
+func GetRooms()([]map[string]interface{}, error) {
 	mu.Lock()
 	roomList := make([]map[string]interface{}, 0)
 	for id, room := range rooms {
@@ -64,7 +82,7 @@ func GetRooms() ([]map[string]interface{}, error) {
 	return roomList, nil
 }
 
-func BroadcastToPeers(room *Room, sender *websocket.Conn, msg SignalMessage) {
+func MessagePeers(room *Room, sender *websocket.Conn, msg SignalMessage) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
@@ -78,8 +96,22 @@ func BroadcastToPeers(room *Room, sender *websocket.Conn, msg SignalMessage) {
 	}
 }
 
+func MessageOwner(room *Room, sender *websocket.Conn, msg SignalMessage) {
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	err := room.Owner.WriteJSON(msg)
+	if err != nil {
+		log.Printf("Broadcast error: %v", err)
+	}	
+}
+
 func Connect(room *Room, conn *websocket.Conn) error{
 	room.mu.Lock()
+	if room.Owner == nil{
+		room.Owner = conn
+	}
+
 	room.Peers[conn] = true
 	room.mu.Unlock()
 

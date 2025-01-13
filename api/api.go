@@ -33,19 +33,18 @@ func HealthCheck(c echo.Context) error {
 }
 
 func CreateRoom(c echo.Context) error{
-	roomID, err := rooms.CreateRoom()
+	roomID, err := rooms.CreateEmptyRoom()
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(http.StatusCreated, roomID)
+	return c.JSON(http.StatusCreated, map[string]string {
+		"roomID": roomID,
+	})	
 }
 
 func HandleWebSocket(c echo.Context) error{
-	//roomID := c.QueryParam("room")
-	//if roomID == ""{
-	//	return c.String(http.StatusBadRequest, "Room ID required")
-	//}
+	roomID := c.QueryParam("room")
 
 	conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
@@ -55,16 +54,25 @@ func HandleWebSocket(c echo.Context) error{
 
 	defer conn.Close()
 
-	roomID, err := rooms.CreateRoom()
-	if (err != nil) {
-		return err
+	var room *rooms.Room
+	var exists bool
+	if roomID != "" {
+		room, exists = rooms.GetRoom(roomID)
+		if !exists {
+			return fmt.Errorf("Could not find room.")
+		}
+	}else{
+		roomID, err = rooms.CreateRoom(conn)
+		if (err != nil) {
+			return err
+		}
+
+		room, exists = rooms.GetRoom(roomID)
+		if !exists {
+			return fmt.Errorf("Could not find room.")
+		}
 	}
 
-	room, exists := rooms.GetRoom(roomID)
-	if !exists {
-		return fmt.Errorf("Could not find room.")
-	}
-	
 	rooms.Connect(room, conn)
 	if (err != nil) {
 		return err
@@ -73,7 +81,7 @@ func HandleWebSocket(c echo.Context) error{
 	totalPeers := len(room.Peers)
 	log.Printf("New peer joined the room %s. Total peers: %d", roomID, totalPeers)
 
-	rooms.BroadcastToPeers(room, conn, rooms.SignalMessage{
+	rooms.MessagePeers(room, conn, rooms.SignalMessage{
 		Type: "peer_joined",
 		From: conn.RemoteAddr().String(),
 	})
@@ -89,7 +97,12 @@ func HandleWebSocket(c echo.Context) error{
 		log.Printf("Room %s: Received message type: %s from %s", roomID, msg.Type, conn.RemoteAddr().String())
 		switch msg.Type {
 		case "offer", "answer", "ice-candidate":
-			rooms.BroadcastToPeers(room, conn, msg)
+			rooms.MessagePeers(room, conn, msg)
+		case "viewer-join":
+			rooms.MessageOwner(room, conn, rooms.SignalMessage{
+				Type: "offer_request",
+				To: conn.RemoteAddr().String(),
+			})
 		}
 	}
 
@@ -101,7 +114,7 @@ func HandleWebSocket(c echo.Context) error{
 		rooms.DeleteRoom(roomID)
 	}
 
-	rooms.BroadcastToPeers(room, conn, rooms.SignalMessage{
+	rooms.MessagePeers(room, conn, rooms.SignalMessage{
 		Type: "peer_left",
 		From: conn.RemoteAddr().String(),
 	})

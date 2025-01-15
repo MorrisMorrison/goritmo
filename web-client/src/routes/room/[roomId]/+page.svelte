@@ -1,10 +1,21 @@
 <script lang="ts">
-  export let roomId: string;
+  import type { Room } from "./+page";
+
+  export let data: {
+    roomId: string;
+    rooms: Room[];
+  };
+
+  const { roomId, rooms } = data;
+
+  console.log("Room ID:", roomId);
+  console.log("Rooms:", rooms);
   let localStream: MediaStream | null = null;
   let remoteStream: MediaStream | null = null;
   let localVideo: HTMLVideoElement | null = null;
   let remoteVideo: HTMLVideoElement | null = null;
   let peerConnection: RTCPeerConnection | null = null;
+
 
   const signalingServer = new WebSocket("ws://localhost:8080/ws?room=" + roomId);
 
@@ -127,6 +138,7 @@
 <main>
   <h1>WebRTC + WebSocket with Svelte (TypeScript)</h1>
   <h2>Welcome to Room {roomId}</h2>
+
   <div>
     <!-- svelte-ignore a11y_media_has_caption -->
     <video autoplay bind:this={localVideo} playsinline></video>
@@ -138,6 +150,11 @@
   <button on:click={startScreenShare}>Start Screenshare</button>
   <button on:click={createOffer}>Create Offer</button>
   <button on:click={startViewer}>Join as Viewer</button>
+  <ul>
+    {#each rooms as room}
+      <li>Room ID: {room.id}, Peer Count: {room.peerCount}</li>
+    {/each}
+  </ul>
 </main>
 
 <style>

@@ -72,7 +72,7 @@ func GetRooms()([]map[string]interface{}, error) {
 		room.mu.Lock()
 		roomList = append(roomList, map[string]interface{}{
 			"id": id,
-			"peer_count": len(room.Peers),
+			"peerCount": len(room.Peers),
 		})
 
 		room.mu.Unlock()
